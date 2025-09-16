@@ -7,6 +7,8 @@ import 'package:busmitra/utils/constants.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:busmitra/services/auth_service.dart';
+import 'package:busmitra/screens/login_screen.dart';
 
 
 class BusTrackingScreen extends StatefulWidget {
@@ -351,7 +353,11 @@ class _BusTrackingScreenState extends State<BusTrackingScreen> {
         foregroundColor: AppConstants.accentColor,
         elevation: 0,
         actions: [
-          // Connection status indicator
+          IconButton(
+            tooltip: 'Logout',
+            icon: const Icon(Icons.logout),
+            onPressed: _logout,
+          ),
           Container(
             margin: const EdgeInsets.only(right: 8),
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -385,8 +391,25 @@ class _BusTrackingScreenState extends State<BusTrackingScreen> {
           ),
         ],
       ),
-      body: _buildBody(),
-      bottomSheet: _buildBottomSheet(),
+      body: Stack(
+        children: [
+          _buildBody(),
+          Positioned(
+            right: 16,
+            bottom: 100,
+            child: Column(
+              children: [
+                FloatingActionButton.small(
+                  onPressed: _fitMapToRoute,
+                  backgroundColor: Colors.white,
+                  child: const Icon(Icons.center_focus_strong, color: Colors.black87),
+                ),
+              ],
+            ),
+          ),
+          _buildDraggableBottomPanel(),
+        ],
+      ),
     );
   }
 
@@ -443,61 +466,72 @@ class _BusTrackingScreenState extends State<BusTrackingScreen> {
     );
   }
 
-  Widget _buildBottomSheet() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 10,
-            offset: Offset(0, -2),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Handle bar
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey[300],
-              borderRadius: BorderRadius.circular(2),
+  Future<void> _logout() async {
+    try {
+      await AuthService().signOut();
+    } finally {
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          (route) => false,
+        );
+      }
+    }
+  }
+
+  Widget _buildDraggableBottomPanel() {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.25,
+      minChildSize: 0.18,
+      maxChildSize: 0.85,
+      builder: (context, controller) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
             ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black12,
+                blurRadius: 10,
+                offset: Offset(0, -2),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-          
-          // Route info
-          _buildRouteInfo(),
-          const SizedBox(height: 16),
-          
-          // Nearest stop info
-          if (_nearestStop != null) _buildNearestStopInfo(),
-          
-          // Active buses info
-          if (_activeBuses.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            _buildActiveBusesInfo(),
-          ],
-          
-          // Upcoming stops info
-          if (_upcomingStops.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            _buildUpcomingStopsInfo(),
-          ],
-          
-          // Last update info
-          const SizedBox(height: 16),
-          _buildLastUpdateInfo(),
-        ],
-      ),
+          child: ListView(
+            controller: controller,
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              _buildRouteInfo(),
+              const SizedBox(height: 12),
+              if (_nearestStop != null) _buildNearestStopInfo(),
+              if (_activeBuses.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _buildActiveBusesInfo(),
+              ],
+              if (_upcomingStops.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _buildUpcomingStopsInfo(),
+              ],
+              const SizedBox(height: 12),
+              _buildLastUpdateInfo(),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -559,6 +593,7 @@ class _BusTrackingScreenState extends State<BusTrackingScreen> {
             _nearestStop!.longitude,
           )
         : 0.0;
+    final etaMinutes = _locationService.getEstimatedTimeToStop(distance);
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -588,6 +623,14 @@ class _BusTrackingScreenState extends State<BusTrackingScreen> {
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'ETA ~ ${_locationService.getFormattedTime(etaMinutes)}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppConstants.lightTextColor,
                   ),
                 ),
               ],

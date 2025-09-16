@@ -1,25 +1,24 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:busmitra/utils/constants.dart';
 import 'package:busmitra/widgets/custom_button.dart';
 import 'package:busmitra/widgets/custom_textfield.dart';
 import 'package:busmitra/services/auth_service.dart';
+import 'package:busmitra/screens/route_selection_screen.dart';
+import 'package:busmitra/screens/signup_screen.dart';
 
-class UserLoginScreen extends StatefulWidget {
-  const UserLoginScreen({super.key});
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
 
   @override
-  UserLoginScreenState createState() => UserLoginScreenState();
+  LoginScreenState createState() => LoginScreenState();
 }
 
-class UserLoginScreenState extends State<UserLoginScreen> 
-    with SingleTickerProviderStateMixin {
+class LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _nameController = TextEditingController();
+  final AuthService _authService = AuthService();
   bool _isLoading = false;
   bool _obscurePassword = true;
-  bool _isSignUp = false;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
@@ -58,43 +57,19 @@ class UserLoginScreenState extends State<UserLoginScreen>
   @override
   void dispose() {
     _animationController.dispose();
-    _emailController.dispose();
-    _passwordController.dispose();
-    _nameController.dispose();
     super.dispose();
   }
 
-  void _toggleAuthMode() {
-    setState(() {
-      _isSignUp = !_isSignUp;
-      // Clear controllers when switching modes
-      if (!_isSignUp) {
-        _nameController.clear();
-      }
-    });
-  }
-
-  void _authenticate() async {
+  void _login() async {
     setState(() => _isLoading = true);
 
-    final String email = _emailController.text.trim();
+    final String driverIdOrEmail = _emailController.text.trim();
     final String password = _passwordController.text;
 
-    if (email.isEmpty || password.isEmpty) {
+    if (driverIdOrEmail.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please enter email and password'),
-          backgroundColor: AppConstants.errorColor,
-        ),
-      );
-      setState(() => _isLoading = false);
-      return;
-    }
-
-    if (_isSignUp && _nameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter your name'),
+          content: Text('Please enter your credentials'),
           backgroundColor: AppConstants.errorColor,
         ),
       );
@@ -103,36 +78,52 @@ class UserLoginScreenState extends State<UserLoginScreen>
     }
 
     try {
-      final authService = Provider.of<AuthService>(context, listen: false);
-      
-      if (_isSignUp) {
-        final String name = _nameController.text.trim();
-        await authService.signUpWithEmailAndPassword(email, password, name);
-      } else {
-        await authService.signInWithEmailAndPassword(email, password);
-      }
-
-      // Update last login time
-      await authService.updateLastLogin();
-
+      await _authService.signInWithEmailAndPassword(driverIdOrEmail, password);
       if (mounted) {
-        Navigator.pushReplacementNamed(context, '/dashboard');
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const RouteSelectionScreen()),
+        );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: ${e.toString().replaceAll('Exception: ', '')}'),
+            content: Text('Error: $e'),
             backgroundColor: AppConstants.errorColor,
-            duration: const Duration(seconds: 3),
           ),
         );
       }
     }
 
-    if (mounted) {
-      setState(() => _isLoading = false);
+    setState(() => _isLoading = false);
+  }
+
+  Future<void> _loginWithGoogle() async {
+    setState(() => _isLoading = true);
+    try {
+      await _authService.signInWithGoogle();
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const RouteSelectionScreen()),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Google Sign-In failed: $e'),
+            backgroundColor: AppConstants.errorColor,
+          ),
+        );
+      }
     }
+    setState(() => _isLoading = false);
+  }
+
+  void _goToSignup() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const SignupScreen()),
+    );
   }
 
   void _togglePasswordVisibility() {
@@ -170,7 +161,7 @@ class UserLoginScreenState extends State<UserLoginScreen>
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.3),
+                        color: Colors.black.withValues(alpha: 0.3),
                         blurRadius: 10,
                         offset: const Offset(0, 5),
                       ),
@@ -202,21 +193,10 @@ class UserLoginScreenState extends State<UserLoginScreen>
                               ),
                             ),
                             const SizedBox(height: 15),
-                            Text(
-                              'BusMitra',
-                              style: TextStyle(
-                                fontSize: 32,
-                                fontWeight: FontWeight.bold,
-                                color: AppConstants.primaryColor,
-                              ),
-                            ),
-                            const SizedBox(height: 5),
-                            Text(
-                              _isSignUp ? 'Create Your Account' : 'Track Your Bus in Real-Time',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: AppConstants.lightTextColor,
-                              ),
+                            Image.asset(
+                              'assets/images/busMitra.png', 
+                              height: 150, 
+                              fit: BoxFit.contain,
                             ),
                           ],
                         ),
@@ -224,7 +204,7 @@ class UserLoginScreenState extends State<UserLoginScreen>
 
                       const SizedBox(height: 30),
 
-                      // Auth Form with staggered animation
+                      // Login Form with staggered animation
                       SizeTransition(
                         sizeFactor: CurvedAnimation(
                           parent: _animationController,
@@ -237,21 +217,9 @@ class UserLoginScreenState extends State<UserLoginScreen>
                           ),
                           child: Column(
                             children: [
-                              // Name field (only for signup)
-                              if (_isSignUp)
-                                CustomTextField(
-                                  controller: _nameController,
-                                  hintText: 'Full Name',
-                                  prefixIcon: Icons.person,
-                                  iconColor: AppConstants.primaryColor,
-                                ),
-                              
-                              if (_isSignUp) const SizedBox(height: 15),
-
-                              // Email field
                               CustomTextField(
                                 controller: _emailController,
-                                hintText: 'Email Address',
+                                hintText: 'Email',
                                 prefixIcon: Icons.email,
                                 iconColor: AppConstants.primaryColor,
                                 keyboardType: TextInputType.emailAddress,
@@ -259,7 +227,6 @@ class UserLoginScreenState extends State<UserLoginScreen>
 
                               const SizedBox(height: 15),
 
-                              // Password field
                               CustomTextField(
                                 controller: _passwordController,
                                 hintText: 'Password',
@@ -269,7 +236,7 @@ class UserLoginScreenState extends State<UserLoginScreen>
                                 suffixIcon: IconButton(
                                   icon: Icon(
                                     _obscurePassword ? Icons.visibility : Icons.visibility_off,
-                                    color: AppConstants.primaryColor.withOpacity(0.6),
+                                    color: AppConstants.primaryColor.withValues(alpha: 0.6),
                                   ),
                                   onPressed: _togglePasswordVisibility,
                                 ),
@@ -277,28 +244,26 @@ class UserLoginScreenState extends State<UserLoginScreen>
 
                               const SizedBox(height: 15),
 
-                              // Forgot Password (only for login)
-                              if (!_isSignUp)
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: TextButton(
-                                    onPressed: () {
-                                      // Navigate to forgot password screen
-                                      // _showForgotPasswordDialog();
-                                    },
-                                    child: Text(
-                                      'Forgot Password?',
-                                      style: TextStyle(color: AppConstants.primaryColor),
-                                    ),
+                              // Forgot Password
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton(
+                                  onPressed: () {
+                                    // Navigate to forgot password screen
+                                  },
+                                  child: const Text(
+                                    'Forgot Password?',
+                                    style: TextStyle(color: AppConstants.primaryColor),
                                   ),
                                 ),
+                              ),
 
                               const SizedBox(height: 20),
 
-                              // Login/Signup Button
+                              // Login Button
                               CustomButton(
-                                text: _isSignUp ? 'Sign Up' : 'Login',
-                                onPressed: _authenticate,
+                                text: 'Login',
+                                onPressed: _login,
                                 isLoading: _isLoading,
                                 backgroundColor: AppConstants.primaryColor,
                                 textColor: AppConstants.accentColor,
@@ -306,37 +271,53 @@ class UserLoginScreenState extends State<UserLoginScreen>
 
                               const SizedBox(height: 20),
 
-                              // Switch between login and signup
+                              // Or divider
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Text(
-                                    _isSignUp 
-                                        ? 'Already have an account?' 
-                                        : 'Don\'t have an account?',
-                                    style: TextStyle(
-                                      color: AppConstants.lightTextColor,
-                                    ),
+                                  Expanded(child: Divider(color: AppConstants.lightTextColor.withValues(alpha: 0.3))),
+                                  const Padding(
+                                    padding: EdgeInsets.symmetric(horizontal: 8),
+                                    child: Text('OR'),
                                   ),
-                                  TextButton(
-                                    onPressed: _toggleAuthMode,
-                                    child: Text(
-                                      _isSignUp ? 'Login' : 'Sign Up',
-                                      style: TextStyle(
-                                        color: AppConstants.primaryColor,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
+                                  Expanded(child: Divider(color: AppConstants.lightTextColor.withValues(alpha: 0.3))),
                                 ],
                               ),
 
-                              const SizedBox(height: 10),
+                              const SizedBox(height: 20),
 
-                              // Support Text
-                              const Text(
-                                'Need help? Contact Support',
-                                style: TextStyle(color: AppConstants.lightTextColor),
+                              // Google Sign-In Button
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton(
+                                  onPressed: _isLoading ? null : _loginWithGoogle,
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                    foregroundColor: AppConstants.secondaryColor,
+                                    side: BorderSide(color: AppConstants.lightTextColor.withValues(alpha: 0.4)),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    backgroundColor: Colors.white,
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Image.asset(
+                                        'assets/images/google_logo.png',
+                                        height: 18,
+                                        width: 18,
+                                        errorBuilder: (context, error, stack) => const Icon(Icons.login, size: 18),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      const Text('Continue with Google'),
+                                    ],
+                                  ),
+                                ),
+                              ),
+
+                              // Signup redirect
+                              TextButton(
+                                onPressed: _goToSignup,
+                                child: const Text('Create an account'),
                               ),
                             ],
                           ),
@@ -352,4 +333,5 @@ class UserLoginScreenState extends State<UserLoginScreen>
       ),
     );
   }
-}
+}  
+

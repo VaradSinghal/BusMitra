@@ -1,22 +1,23 @@
 import 'package:busmitra/models/bus_model.dart';
 import 'package:busmitra/models/route_model.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_database/firebase_database.dart';
 
 
 class DatabaseService {
   final FirebaseDatabase _database = FirebaseDatabase.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // Get all available routes
   Future<List<BusRoute>> getRoutes() async {
     try {
-      final snapshot = await _database.ref('routes').get();
-      if (snapshot.exists) {
-        final Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
-        return data.entries.map((entry) {
-          return BusRoute.fromMap(entry.key, Map<String, dynamic>.from(entry.value));
-        }).toList();
+      final query = await _firestore.collection('routes').get();
+      final List<BusRoute> routes = [];
+      for (final doc in query.docs) {
+        final route = await _busRouteFromFirestoreDoc(doc);
+        if (route != null) routes.add(route);
       }
-      return [];
+      return routes;
     } catch (e) {
       print('Error fetching routes: $e');
       return [];
@@ -33,9 +34,7 @@ class DatabaseService {
         
         data.forEach((driverId, busData) {
           final busMap = Map<String, dynamic>.from(busData as Map<dynamic, dynamic>);
-          if (busMap['routeId'] == routeId && 
-              busMap['isOnline'] == true && 
-              busMap['isOnDuty'] == true) {
+          if (busMap['routeId'] == routeId && _isDriverActive(busMap)) {
             buses.add(Bus.fromMap(driverId, busMap));
           }
         });
@@ -55,7 +54,7 @@ class DatabaseService {
         
         data.forEach((driverId, busData) {
           final busMap = Map<String, dynamic>.from(busData as Map<dynamic, dynamic>);
-          if (busMap['isOnline'] == true && busMap['isOnDuty'] == true) {
+          if (_isDriverActive(busMap)) {
             buses.add(Bus.fromMap(driverId, busMap));
           }
         });
@@ -81,11 +80,9 @@ class DatabaseService {
   // Get route by ID
   Future<BusRoute?> getRouteById(String routeId) async {
     try {
-      final snapshot = await _database.ref('routes/$routeId').get();
-      if (snapshot.exists) {
-        return BusRoute.fromMap(routeId, Map<String, dynamic>.from(snapshot.value as Map<dynamic, dynamic>));
-      }
-      return null;
+      final doc = await _firestore.collection('routes').doc(routeId).get();
+      if (!doc.exists) return null;
+      return _busRouteFromFirestoreDoc(doc);
     } catch (e) {
       print('Error fetching route: $e');
       return null;
@@ -102,7 +99,7 @@ class DatabaseService {
         
         data.forEach((driverId, busData) {
           final busMap = Map<String, dynamic>.from(busData as Map<dynamic, dynamic>);
-          if (busMap['isOnline'] == true && busMap['isOnDuty'] == true) {
+          if (_isDriverActive(busMap)) {
             activeRouteIds.add(busMap['routeId']?.toString() ?? '');
           }
         });
@@ -133,9 +130,7 @@ class DatabaseService {
         
         data.forEach((driverId, busData) {
           final busMap = Map<String, dynamic>.from(busData as Map<dynamic, dynamic>);
-          if (busMap['routeId'] == routeId && 
-              busMap['isOnline'] == true && 
-              busMap['isOnDuty'] == true) {
+          if (busMap['routeId'] == routeId && _isDriverActive(busMap)) {
             count++;
           }
         });
@@ -171,5 +166,84 @@ class DatabaseService {
       
       return summary;
     });
+  }
+
+  bool _isDriverActive(Map<String, dynamic> busMap) {
+    final bool isOnDuty = busMap['isOnDuty'] == true;
+    if (!isOnDuty) return false;
+
+    final String status = busMap['connectionStatus']?.toString().toLowerCase() ?? '';
+    final bool isOnline = busMap['isOnline'] == true;
+    final int ts = (busMap['timestamp'] is int) ? busMap['timestamp'] as int : 0;
+    final int now = DateTime.now().millisecondsSinceEpoch;
+    final bool isRecent = ts > 0 && (now - ts) < 5 * 60 * 1000; // 5 minutes
+
+    return status == 'connected' || isOnline || isRecent;
+  }
+
+  // Build BusRoute from Firestore doc supporting either embedded stops array/map or subcollection
+  Future<BusRoute?> _busRouteFromFirestoreDoc(DocumentSnapshot<Map<String, dynamic>> doc) async {
+    try {
+      final data = doc.data();
+      if (data == null) return null;
+
+      Map<String, dynamic> routeMap = Map<String, dynamic>.from(data);
+
+      // Try to load stops from subcollection if present
+      List<RouteStop> stops = [];
+      try {
+        final stopsQuery = await doc.reference.collection('stops').orderBy('sequence').get();
+        if (stopsQuery.docs.isNotEmpty) {
+          for (final stopDoc in stopsQuery.docs) {
+            final stopData = stopDoc.data();
+            final stop = RouteStop.fromMap({
+              'id': stopDoc.id,
+              ...stopData,
+            });
+            stops.add(stop);
+          }
+        }
+      } catch (_) {
+        // ignore, fallback to embedded
+      }
+
+      if (stops.isEmpty && routeMap['stops'] != null) {
+        final stopsData = routeMap['stops'];
+        if (stopsData is List) {
+          for (final s in stopsData) {
+            if (s is Map) {
+              stops.add(RouteStop.fromMap(Map<String, dynamic>.from(s as Map)));
+            }
+          }
+        } else if (stopsData is Map) {
+          (stopsData as Map).forEach((key, value) {
+            if (value is Map) {
+              final m = Map<String, dynamic>.from(value as Map);
+              m['id'] = m['id']?.toString() ?? key.toString();
+              stops.add(RouteStop.fromMap(m));
+            }
+          });
+        }
+        stops.sort((a, b) => a.sequence.compareTo(b.sequence));
+      }
+
+      final enriched = {
+        ...routeMap,
+        'stops': {
+          for (final s in stops) s.id: {
+            'id': s.id,
+            'name': s.name,
+            'latitude': s.latitude,
+            'longitude': s.longitude,
+            'sequence': s.sequence,
+          }
+        }
+      };
+
+      return BusRoute.fromMap(doc.id, enriched);
+    } catch (e) {
+      print('Error parsing route ${doc.id}: $e');
+      return null;
+    }
   }
 }

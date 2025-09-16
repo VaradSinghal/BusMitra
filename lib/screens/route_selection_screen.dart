@@ -4,6 +4,8 @@ import 'package:busmitra/services/database_service.dart';
 import 'package:busmitra/utils/constants.dart';
 import 'package:busmitra/widgets/route_card.dart';
 import 'package:flutter/material.dart';
+import 'package:busmitra/services/auth_service.dart';
+import 'package:busmitra/screens/login_screen.dart';
 
 
 class RouteSelectionScreen extends StatefulWidget {
@@ -16,46 +18,15 @@ class RouteSelectionScreen extends StatefulWidget {
 class _RouteSelectionScreenState extends State<RouteSelectionScreen> {
   final DatabaseService _databaseService = DatabaseService();
   
-  List<BusRoute> _routes = [];
-  bool _isLoading = true;
   String _searchQuery = '';
-  String? _errorMessage;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadRoutes();
-  }
-
-  Future<void> _loadRoutes() async {
-    try {
-      setState(() {
-        _isLoading = true;
-        _errorMessage = null;
-      });
-
-      final routes = await _databaseService.getRoutes();
-      setState(() {
-        _routes = routes;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to load routes: $e';
-        _isLoading = false;
-      });
-    }
-  }
-
-  List<BusRoute> get _filteredRoutes {
-    if (_searchQuery.isEmpty) {
-      return _routes;
-    }
-    
-    return _routes.where((route) {
-      return route.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-             route.startPoint.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-             route.endPoint.toLowerCase().contains(_searchQuery.toLowerCase());
+  
+  List<BusRoute> _applySearchFilter(List<BusRoute> routes) {
+    if (_searchQuery.isEmpty) return routes;
+    return routes.where((route) {
+      final q = _searchQuery.toLowerCase();
+      return route.name.toLowerCase().contains(q) ||
+             route.startPoint.toLowerCase().contains(q) ||
+             route.endPoint.toLowerCase().contains(q);
     }).toList();
   }
 
@@ -76,52 +47,96 @@ class _RouteSelectionScreenState extends State<RouteSelectionScreen> {
         backgroundColor: AppConstants.primaryColor,
         foregroundColor: AppConstants.accentColor,
         elevation: 0,
+        actions: [
+          IconButton(
+            tooltip: 'Logout',
+            icon: const Icon(Icons.logout),
+            onPressed: _logout,
+          ),
+        ],
       ),
       body: _buildBody(),
     );
   }
 
   Widget _buildBody() {
-    if (_isLoading) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Loading routes...'),
-          ],
-        ),
-      );
-    }
-
-    if (_errorMessage != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, size: 64, color: Colors.red),
-            const SizedBox(height: 16),
-            Text(
-              _errorMessage!,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.red),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadRoutes,
-              child: const Text('Retry'),
-            ),
-          ],
-        ),
-      );
-    }
-
     return Column(
       children: [
         _buildSearchBar(),
         Expanded(
-          child: _buildRoutesList(),
+          child: StreamBuilder<List<BusRoute>>(
+            stream: _databaseService.getActiveRoutes(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 16),
+                      Text('Loading active routes...'),
+                    ],
+                  ),
+                );
+              }
+              if (snapshot.hasError) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Failed to load active routes',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.red),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              final routes = _applySearchFilter(snapshot.data ?? []);
+              if (routes.isEmpty) {
+                return const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.route, size: 64, color: AppConstants.lightTextColor),
+                      SizedBox(height: 16),
+                      Text(
+                        'No active routes found',
+                        style: TextStyle(fontSize: 18, color: AppConstants.lightTextColor),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              return ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: routes.length,
+                itemBuilder: (context, index) {
+                  final route = routes[index];
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    child: StreamBuilder<int>(
+                      stream: _databaseService.getBusCountForRoute(route.id),
+                      builder: (context, countSnap) {
+                        final count = countSnap.data ?? 0;
+                        return RouteCard(
+                          route: route,
+                          activeBusCount: count,
+                          isActive: count > 0,
+                          onTap: () => _navigateToBusTracking(route),
+                        );
+                      },
+                    ),
+                  );
+                },
+              );
+            },
+          ),
         ),
       ],
     );
@@ -150,37 +165,18 @@ class _RouteSelectionScreenState extends State<RouteSelectionScreen> {
     );
   }
 
-  Widget _buildRoutesList() {
-    if (_filteredRoutes.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.route, size: 64, color: AppConstants.lightTextColor),
-            const SizedBox(height: 16),
-            Text(
-              'No routes found',
-              style: TextStyle(fontSize: 18, color: AppConstants.lightTextColor),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _filteredRoutes.length,
-      itemBuilder: (context, index) {
-        final route = _filteredRoutes[index];
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: RouteCard(
-            route: route,
-            activeBusCount: 0, // This screen doesn't show active bus count
-            onTap: () => _navigateToBusTracking(route),
-          ),
+  Future<void> _logout() async {
+    try {
+      await AuthService().signOut();
+    } finally {
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          (route) => false,
         );
-      },
-    );
+      }
+    }
   }
+
+  // list rendering moved into stream builder above
 }
