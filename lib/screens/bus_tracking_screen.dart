@@ -106,10 +106,11 @@ class _BusTrackingScreenState extends State<BusTrackingScreen> {
     }
   }
 
-  void _setupMapData() {
+  void _setupMapData() async {
     _createStopMarkers();
-    _createRoutePolyline();
+    await _createRoutePolyline();
     _createUserLocationMarker();
+    setState(() {}); // Trigger UI update after polyline is created
   }
 
   void _createStopMarkers() {
@@ -139,22 +140,58 @@ class _BusTrackingScreenState extends State<BusTrackingScreen> {
     }
   }
 
-  void _createRoutePolyline() {
+  Future<void> _createRoutePolyline() async {
     if (widget.route.stops.length < 2) return;
 
-    final List<LatLng> points = widget.route.stops
-        .map((stop) => LatLng(stop.latitude, stop.longitude))
-        .toList();
+    try {
+      // Get road-following polyline from Google Directions API
+      final roadPoints = await _databaseService.getRoutePolyline(widget.route.stops);
+      
+      if (roadPoints.isNotEmpty) {
+        _polylines.add(
+          Polyline(
+            polylineId: const PolylineId('route'),
+            points: roadPoints,
+            color: AppConstants.primaryColor,
+            width: 5,
+            patterns: [PatternItem.dash(20), PatternItem.gap(10)],
+          ),
+        );
+        print('Road polyline created with ${roadPoints.length} points');
+      } else {
+        // Fallback to straight lines if API fails
+        final List<LatLng> points = widget.route.stops
+            .map((stop) => LatLng(stop.latitude, stop.longitude))
+            .toList();
 
-    _polylines.add(
-      Polyline(
-        polylineId: const PolylineId('route'),
-        points: points,
-        color: AppConstants.primaryColor,
-        width: 4,
-        patterns: [PatternItem.dash(20), PatternItem.gap(10)],
-      ),
-    );
+        _polylines.add(
+          Polyline(
+            polylineId: const PolylineId('route'),
+            points: points,
+            color: AppConstants.primaryColor,
+            width: 4,
+            patterns: [PatternItem.dash(20), PatternItem.gap(10)],
+          ),
+        );
+        print('Fallback polyline created with ${points.length} points');
+      }
+    } catch (e) {
+      print('Error creating route polyline: $e');
+      // Fallback to straight lines
+      final List<LatLng> points = widget.route.stops
+          .map((stop) => LatLng(stop.latitude, stop.longitude))
+          .toList();
+
+      _polylines.add(
+        Polyline(
+          polylineId: const PolylineId('route'),
+          points: points,
+          color: AppConstants.primaryColor,
+          width: 4,
+          patterns: [PatternItem.dash(20), PatternItem.gap(10)],
+        ),
+      );
+    }
   }
 
   void _createUserLocationMarker() {
@@ -626,11 +663,20 @@ class _BusTrackingScreenState extends State<BusTrackingScreen> {
                   ),
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  'ETA ~ ${_locationService.getFormattedTime(etaMinutes)}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppConstants.lightTextColor,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppConstants.primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppConstants.primaryColor.withOpacity(0.3)),
+                  ),
+                  child: Text(
+                    'ETA ~ ${_locationService.getFormattedTime(etaMinutes)}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: AppConstants.primaryColor,
+                    ),
                   ),
                 ),
               ],
