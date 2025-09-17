@@ -1,6 +1,7 @@
 import 'package:busmitra/models/route_model.dart';
 import 'package:busmitra/utils/constants.dart';
 import 'package:flutter/material.dart';
+import 'package:busmitra/l10n/app_localizations.dart';
 
 class RouteCard extends StatelessWidget {
   final BusRoute route;
@@ -18,6 +19,7 @@ class RouteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Card(
       elevation: isActive ? 4 : 2,
       shape: RoundedRectangleBorder(
@@ -43,7 +45,7 @@ class RouteCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          route.name,
+                          _localizedRouteName(l10n, route.name),
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -52,8 +54,8 @@ class RouteCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '${route.startPoint} → ${route.endPoint}',
-                          style: TextStyle(
+                          '${route.startPoint} ${l10n.toLabel} ${route.endPoint}',
+                          style: const TextStyle(
                             fontSize: 14,
                             color: AppConstants.lightTextColor,
                           ),
@@ -70,9 +72,9 @@ class RouteCard extends StatelessWidget {
                         color: AppConstants.primaryColor,
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Text(
-                        'ACTIVE',
-                        style: TextStyle(
+                      child: Text(
+                        l10n.activeLabel,
+                        style: const TextStyle(
                           color: AppConstants.accentColor,
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
@@ -88,19 +90,19 @@ class RouteCard extends StatelessWidget {
                 children: [
                   _buildInfoChip(
                     Icons.straighten,
-                    '${route.distance.toStringAsFixed(1)} km',
+                    '${route.distance.toStringAsFixed(1)} ${l10n.km}',
                     AppConstants.primaryColor,
                   ),
                   const SizedBox(width: 8),
                   _buildInfoChip(
                     Icons.access_time,
-                    '${route.estimatedTime} min',
+                    '${route.estimatedTime} ${l10n.min}',
                     AppConstants.secondaryColor,
                   ),
                   const SizedBox(width: 8),
                   _buildInfoChip(
                     Icons.location_on,
-                    '${route.stops.length} stops',
+                    '${route.stops.length} ${l10n.stops}',
                     AppConstants.primaryColor,
                   ),
                 ],
@@ -118,8 +120,8 @@ class RouteCard extends StatelessWidget {
                   const SizedBox(width: 4),
                   Text(
                     activeBusCount > 0 
-                        ? '$activeBusCount active bus${activeBusCount > 1 ? 'es' : ''}'
-                        : 'No active buses',
+                        ? '$activeBusCount ${l10n.activeBuses.toLowerCase()}'
+                        : l10n.noActiveBuses,
                     style: TextStyle(
                       fontSize: 12,
                       color: activeBusCount > 0 ? AppConstants.primaryColor : AppConstants.lightTextColor,
@@ -128,7 +130,7 @@ class RouteCard extends StatelessWidget {
                   ),
                   const Spacer(),
                   if (onTap != null)
-                    Icon(
+                    const Icon(
                       Icons.arrow_forward_ios,
                       size: 16,
                       color: AppConstants.lightTextColor,
@@ -170,4 +172,15 @@ class RouteCard extends StatelessWidget {
       ),
     );
   }
+}
+
+String _localizedRouteName(AppLocalizations l10n, String original) {
+  // Replace only textual labels, leave numbers/codes intact.
+  String result = original;
+  // Common patterns: "Route", " to ", sometimes ':' after name
+  result = result.replaceFirst(RegExp(r'^Route(\s*)'), '${l10n.routeLabel} ');
+  // Remove the temporary marker preserving spacing
+  result = result.replaceFirst('\u0001', '');
+  result = result.replaceAll(' to ', ' ${l10n.toLabel} ');
+  return result;
 }

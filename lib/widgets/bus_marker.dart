@@ -34,7 +34,7 @@ class BusMarker extends StatelessWidget {
             ),
           ],
         ),
-        child: Icon(
+        child: const Icon(
           Icons.directions_bus,
           color: Colors.white,
           size: 24,

@@ -219,9 +219,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildHeader() {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: AppConstants.primaryColor,
-        borderRadius: const BorderRadius.only(
+        borderRadius: BorderRadius.only(
           bottomLeft: Radius.circular(20),
           bottomRight: Radius.circular(20),
         ),
@@ -341,7 +341,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          const Text(
             'Active Routes',
             style: TextStyle(
               fontSize: 18,
@@ -383,7 +383,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.route, size: 64, color: AppConstants.lightTextColor),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             Text(
               'No routes found',
               style: TextStyle(fontSize: 18, color: AppConstants.lightTextColor),

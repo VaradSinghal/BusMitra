@@ -1,10 +1,14 @@
+import 'package:busmitra/l10n/app_localizations.dart';
+import 'package:busmitra/screens/language_selection_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:busmitra/utils/constants.dart';
 import 'package:busmitra/widgets/custom_button.dart';
 import 'package:busmitra/widgets/custom_textfield.dart';
 import 'package:busmitra/services/auth_service.dart';
+import 'package:busmitra/services/language_service.dart';
 import 'package:busmitra/screens/route_selection_screen.dart';
 import 'package:busmitra/screens/signup_screen.dart';
+import 'package:provider/provider.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -126,6 +130,22 @@ class LoginScreenState extends State<LoginScreen> with SingleTickerProviderState
     );
   }
 
+  Future<void> _logout() async {
+    try {
+      await AuthService().signOut();
+      // Clear language preference on logout
+      final languageService = Provider.of<LanguageService>(context, listen: false);
+      await languageService.clearLanguage();
+    } finally {
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const LanguageSelectionScreen()),
+          (route) => false,
+        );
+      }
+    }
+  }
+
   void _togglePasswordVisibility() {
     setState(() {
       _obscurePassword = !_obscurePassword;
@@ -134,6 +154,7 @@ class LoginScreenState extends State<LoginScreen> with SingleTickerProviderState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -182,7 +203,7 @@ class LoginScreenState extends State<LoginScreen> with SingleTickerProviderState
                           children: [
                             Container(
                               padding: const EdgeInsets.all(15),
-                              decoration: BoxDecoration(
+                              decoration: const BoxDecoration(
                                 color: AppConstants.primaryColor,
                                 shape: BoxShape.circle,
                               ),
@@ -219,7 +240,7 @@ class LoginScreenState extends State<LoginScreen> with SingleTickerProviderState
                             children: [
                               CustomTextField(
                                 controller: _emailController,
-                                hintText: 'Email',
+                                hintText: l10n.email,
                                 prefixIcon: Icons.email,
                                 iconColor: AppConstants.primaryColor,
                                 keyboardType: TextInputType.emailAddress,
@@ -229,7 +250,7 @@ class LoginScreenState extends State<LoginScreen> with SingleTickerProviderState
 
                               CustomTextField(
                                 controller: _passwordController,
-                                hintText: 'Password',
+                                hintText: l10n.password,
                                 prefixIcon: Icons.lock,
                                 obscureText: _obscurePassword,
                                 iconColor: AppConstants.primaryColor,
@@ -251,9 +272,9 @@ class LoginScreenState extends State<LoginScreen> with SingleTickerProviderState
                                   onPressed: () {
                                     // Navigate to forgot password screen
                                   },
-                                  child: const Text(
-                                    'Forgot Password?',
-                                    style: TextStyle(color: AppConstants.primaryColor),
+                                  child: Text(
+                                    l10n.forgotPassword,
+                                    style: const TextStyle(color: AppConstants.primaryColor),
                                   ),
                                 ),
                               ),
@@ -262,7 +283,7 @@ class LoginScreenState extends State<LoginScreen> with SingleTickerProviderState
 
                               // Login Button
                               CustomButton(
-                                text: 'Login',
+                                text: l10n.login,
                                 onPressed: _login,
                                 isLoading: _isLoading,
                                 backgroundColor: AppConstants.primaryColor,
@@ -308,7 +329,7 @@ class LoginScreenState extends State<LoginScreen> with SingleTickerProviderState
                                         errorBuilder: (context, error, stack) => const Icon(Icons.login, size: 18),
                                       ),
                                       const SizedBox(width: 8),
-                                      const Text('Continue with Google'),
+                                      Text(l10n.continueWithGoogle),
                                     ],
                                   ),
                                 ),
@@ -317,7 +338,7 @@ class LoginScreenState extends State<LoginScreen> with SingleTickerProviderState
                               // Signup redirect
                               TextButton(
                                 onPressed: _goToSignup,
-                                child: const Text('Create an account'),
+                                  child: Text(l10n.createAccount),
                               ),
                             ],
                           ),

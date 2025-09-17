@@ -1,9 +1,10 @@
+import 'package:busmitra/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:busmitra/utils/constants.dart';
 import 'package:busmitra/widgets/custom_textfield.dart';
 import 'package:busmitra/widgets/custom_button.dart';
 import 'package:busmitra/services/auth_service.dart';
-import 'package:busmitra/screens/route_selection_screen.dart';
+import 'package:busmitra/screens/language_selection_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -30,7 +31,7 @@ class _SignupScreenState extends State<SignupScreen> {
       );
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const RouteSelectionScreen()),
+          MaterialPageRoute(builder: (_) => const LanguageSelectionScreen()),
           (route) => false,
         );
       }
@@ -53,7 +54,7 @@ class _SignupScreenState extends State<SignupScreen> {
       await _authService.signInWithGoogle();
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const RouteSelectionScreen()),
+          MaterialPageRoute(builder: (_) => const LanguageSelectionScreen()),
           (route) => false,
         );
       }
@@ -72,9 +73,10 @@ class _SignupScreenState extends State<SignupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Create account'),
+        title: Text(l10n.createAccount),
         backgroundColor: AppConstants.primaryColor,
         foregroundColor: AppConstants.accentColor,
         elevation: 0,
@@ -85,14 +87,14 @@ class _SignupScreenState extends State<SignupScreen> {
           children: [
             CustomTextField(
               controller: _nameController,
-              hintText: 'Full name',
+              hintText: l10n.fullName,
               prefixIcon: Icons.person,
               iconColor: AppConstants.primaryColor,
             ),
             const SizedBox(height: 12),
             CustomTextField(
               controller: _emailController,
-              hintText: 'Email',
+              hintText: l10n.email,
               prefixIcon: Icons.email,
               iconColor: AppConstants.primaryColor,
               keyboardType: TextInputType.emailAddress,
@@ -100,14 +102,14 @@ class _SignupScreenState extends State<SignupScreen> {
             const SizedBox(height: 12),
             CustomTextField(
               controller: _passwordController,
-              hintText: 'Password',
+              hintText: l10n.password,
               prefixIcon: Icons.lock,
               obscureText: true,
               iconColor: AppConstants.primaryColor,
             ),
             const SizedBox(height: 20),
             CustomButton(
-              text: 'Sign up',
+              text: l10n.signup,
               onPressed: () { if (_isLoading) return; _signup(); },
               isLoading: _isLoading,
               backgroundColor: AppConstants.primaryColor,

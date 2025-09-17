@@ -9,6 +9,9 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:busmitra/services/auth_service.dart';
 import 'package:busmitra/screens/login_screen.dart';
+import 'package:busmitra/l10n/app_localizations.dart';
+import 'package:provider/provider.dart';
+import 'package:busmitra/services/language_service.dart';
 
 
 class BusTrackingScreen extends StatefulWidget {
@@ -37,8 +40,8 @@ class _BusTrackingScreenState extends State<BusTrackingScreen> {
   List<RouteStop> _upcomingStops = [];
   bool _isLoading = true;
   String? _errorMessage;
-  Set<Marker> _markers = {};
-  Set<Polyline> _polylines = {};
+  final Set<Marker> _markers = {};
+  final Set<Polyline> _polylines = {};
   DateTime _lastUpdate = DateTime.now();
   bool _isConnected = true;
 
@@ -383,6 +386,7 @@ class _BusTrackingScreenState extends State<BusTrackingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.route.name),
@@ -391,7 +395,7 @@ class _BusTrackingScreenState extends State<BusTrackingScreen> {
         elevation: 0,
         actions: [
           IconButton(
-            tooltip: 'Logout',
+            tooltip: l10n.logout,
             icon: const Icon(Icons.logout),
             onPressed: _logout,
           ),
@@ -412,7 +416,7 @@ class _BusTrackingScreenState extends State<BusTrackingScreen> {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  _isConnected ? 'Live' : 'Offline',
+                  _isConnected ? l10n.live : l10n.offline,
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 12,
@@ -444,7 +448,7 @@ class _BusTrackingScreenState extends State<BusTrackingScreen> {
               ],
             ),
           ),
-          _buildDraggableBottomPanel(),
+          _buildDraggableBottomPanel(context),
         ],
       ),
     );
@@ -506,6 +510,9 @@ class _BusTrackingScreenState extends State<BusTrackingScreen> {
   Future<void> _logout() async {
     try {
       await AuthService().signOut();
+      // Clear language preference on logout
+      final languageService = Provider.of<LanguageService>(context, listen: false);
+      await languageService.clearLanguage();
     } finally {
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
@@ -516,7 +523,8 @@ class _BusTrackingScreenState extends State<BusTrackingScreen> {
     }
   }
 
-  Widget _buildDraggableBottomPanel() {
+  Widget _buildDraggableBottomPanel(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return DraggableScrollableSheet(
       initialChildSize: 0.25,
       minChildSize: 0.18,
@@ -552,19 +560,19 @@ class _BusTrackingScreenState extends State<BusTrackingScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              _buildRouteInfo(),
+              _buildRouteInfo(context),
               const SizedBox(height: 12),
-              if (_nearestStop != null) _buildNearestStopInfo(),
+              if (_nearestStop != null) _buildNearestStopInfo(context),
               if (_activeBuses.isNotEmpty) ...[
                 const SizedBox(height: 12),
-                _buildActiveBusesInfo(),
+                _buildActiveBusesInfo(context),
               ],
               if (_upcomingStops.isNotEmpty) ...[
                 const SizedBox(height: 12),
-                _buildUpcomingStopsInfo(),
+                _buildUpcomingStopsInfo(context),
               ],
               const SizedBox(height: 12),
-              _buildLastUpdateInfo(),
+              _buildLastUpdateInfo(context),
             ],
           ),
         );
@@ -572,7 +580,8 @@ class _BusTrackingScreenState extends State<BusTrackingScreen> {
     );
   }
 
-  Widget _buildRouteInfo() {
+  Widget _buildRouteInfo(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Row(
       children: [
         Expanded(
@@ -610,7 +619,7 @@ class _BusTrackingScreenState extends State<BusTrackingScreen> {
             ),
             Text(
               '${widget.route.estimatedTime} min',
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 12,
                 color: AppConstants.lightTextColor,
               ),
@@ -621,7 +630,8 @@ class _BusTrackingScreenState extends State<BusTrackingScreen> {
     );
   }
 
-  Widget _buildNearestStopInfo() {
+  Widget _buildNearestStopInfo(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final distance = _currentUserLocation != null
         ? _locationService.calculateDistance(
             _currentUserLocation!.latitude,
@@ -647,9 +657,9 @@ class _BusTrackingScreenState extends State<BusTrackingScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Nearest Stop',
-                  style: TextStyle(
+                Text(
+                  l10n.nearestStop,
+                  style: const TextStyle(
                     fontSize: 12,
                     color: AppConstants.primaryColor,
                     fontWeight: FontWeight.bold,
@@ -671,7 +681,7 @@ class _BusTrackingScreenState extends State<BusTrackingScreen> {
                     border: Border.all(color: AppConstants.primaryColor.withOpacity(0.3)),
                   ),
                   child: Text(
-                    'ETA ~ ${_locationService.getFormattedTime(etaMinutes)}',
+                    '${l10n.eta} ~ ${_locationService.getFormattedTime(etaMinutes)}',
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
@@ -695,7 +705,8 @@ class _BusTrackingScreenState extends State<BusTrackingScreen> {
     );
   }
 
-  Widget _buildActiveBusesInfo() {
+  Widget _buildActiveBusesInfo(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -711,7 +722,7 @@ class _BusTrackingScreenState extends State<BusTrackingScreen> {
               const Icon(Icons.directions_bus, color: AppConstants.primaryColor, size: 20),
               const SizedBox(width: 8),
               Text(
-                'Active Buses (${_activeBuses.length})',
+                '${l10n.activeBuses} (${_activeBuses.length})',
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
@@ -760,7 +771,7 @@ class _BusTrackingScreenState extends State<BusTrackingScreen> {
                 ),
                 Text(
                   bus.driverName,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 10,
                     color: AppConstants.lightTextColor,
                   ),
@@ -780,7 +791,8 @@ class _BusTrackingScreenState extends State<BusTrackingScreen> {
     );
   }
 
-  Widget _buildUpcomingStopsInfo() {
+  Widget _buildUpcomingStopsInfo(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -810,7 +822,7 @@ class _BusTrackingScreenState extends State<BusTrackingScreen> {
           if (_upcomingStops.length > 3)
             Text(
               '... and ${_upcomingStops.length - 3} more stops',
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 12,
                 color: AppConstants.lightTextColor,
                 fontStyle: FontStyle.italic,
@@ -846,7 +858,7 @@ class _BusTrackingScreenState extends State<BusTrackingScreen> {
           ),
           Text(
             'Stop ${stop.sequence}',
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 10,
               color: AppConstants.lightTextColor,
             ),
@@ -856,7 +868,8 @@ class _BusTrackingScreenState extends State<BusTrackingScreen> {
     );
   }
 
-  Widget _buildLastUpdateInfo() {
+  Widget _buildLastUpdateInfo(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final now = DateTime.now();
     final difference = now.difference(_lastUpdate);
     String updateText;
@@ -886,14 +899,14 @@ class _BusTrackingScreenState extends State<BusTrackingScreen> {
           const SizedBox(width: 8),
           Text(
             updateText,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 12,
               color: AppConstants.lightTextColor,
             ),
           ),
           const Spacer(),
           if (!_isConnected)
-            Text(
+            const Text(
               'Connection lost',
               style: TextStyle(
                 fontSize: 12,

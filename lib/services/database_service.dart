@@ -215,13 +215,13 @@ class DatabaseService {
         if (stopsData is List) {
           for (final s in stopsData) {
             if (s is Map) {
-              stops.add(RouteStop.fromMap(Map<String, dynamic>.from(s as Map)));
+              stops.add(RouteStop.fromMap(Map<String, dynamic>.from(s)));
             }
           }
         } else if (stopsData is Map) {
-          (stopsData as Map).forEach((key, value) {
+          (stopsData).forEach((key, value) {
             if (value is Map) {
-              final m = Map<String, dynamic>.from(value as Map);
+              final m = Map<String, dynamic>.from(value);
               m['id'] = m['id']?.toString() ?? key.toString();
               stops.add(RouteStop.fromMap(m));
             }

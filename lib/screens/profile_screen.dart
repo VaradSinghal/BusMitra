@@ -451,7 +451,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: AppConstants.primaryColor,
+            activeThumbColor: AppConstants.primaryColor,
           ),
         ],
       ),
@@ -556,7 +556,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
-            Icon(
+            const Icon(
               Icons.arrow_forward_ios,
               size: 16,
               color: AppConstants.lightTextColor,

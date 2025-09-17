@@ -6,6 +6,9 @@ import 'package:busmitra/widgets/route_card.dart';
 import 'package:flutter/material.dart';
 import 'package:busmitra/services/auth_service.dart';
 import 'package:busmitra/screens/login_screen.dart';
+import 'package:busmitra/l10n/app_localizations.dart';
+import 'package:provider/provider.dart';
+import 'package:busmitra/services/language_service.dart';
 
 
 class RouteSelectionScreen extends StatefulWidget {
@@ -41,15 +44,16 @@ class _RouteSelectionScreenState extends State<RouteSelectionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Select Route'),
+        title: Text(l10n.selectRoute),
         backgroundColor: AppConstants.primaryColor,
         foregroundColor: AppConstants.accentColor,
         elevation: 0,
         actions: [
           IconButton(
-            tooltip: 'Logout',
+            tooltip: l10n.logout,
             icon: const Icon(Icons.logout),
             onPressed: _logout,
           ),
@@ -67,14 +71,15 @@ class _RouteSelectionScreenState extends State<RouteSelectionScreen> {
           child: StreamBuilder<List<BusRoute>>(
             stream: _databaseService.getActiveRoutes(),
             builder: (context, snapshot) {
+              final l10n = AppLocalizations.of(context)!;
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(
+                return Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      CircularProgressIndicator(),
-                      SizedBox(height: 16),
-                      Text('Loading active routes...'),
+                      const CircularProgressIndicator(),
+                      const SizedBox(height: 16),
+                      Text(l10n.loadingActiveRoutes),
                     ],
                   ),
                 );
@@ -87,7 +92,7 @@ class _RouteSelectionScreenState extends State<RouteSelectionScreen> {
                       const Icon(Icons.error_outline, size: 64, color: Colors.red),
                       const SizedBox(height: 16),
                       Text(
-                        'Failed to load active routes',
+                        l10n.failedToLoadRoutes,
                         textAlign: TextAlign.center,
                         style: const TextStyle(color: Colors.red),
                       ),
@@ -98,15 +103,15 @@ class _RouteSelectionScreenState extends State<RouteSelectionScreen> {
 
               final routes = _applySearchFilter(snapshot.data ?? []);
               if (routes.isEmpty) {
-                return const Center(
+                return Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.route, size: 64, color: AppConstants.lightTextColor),
-                      SizedBox(height: 16),
+                      const Icon(Icons.route, size: 64, color: AppConstants.lightTextColor),
+                      const SizedBox(height: 16),
                       Text(
-                        'No active routes found',
-                        style: TextStyle(fontSize: 18, color: AppConstants.lightTextColor),
+                        l10n.noActiveRoutes,
+                        style: const TextStyle(fontSize: 18, color: AppConstants.lightTextColor),
                       ),
                     ],
                   ),
@@ -143,6 +148,7 @@ class _RouteSelectionScreenState extends State<RouteSelectionScreen> {
   }
 
   Widget _buildSearchBar() {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.all(16),
       child: TextField(
@@ -152,7 +158,7 @@ class _RouteSelectionScreenState extends State<RouteSelectionScreen> {
           });
         },
         decoration: InputDecoration(
-          hintText: 'Search routes...',
+          hintText: l10n.searchRoutes,
           prefixIcon: const Icon(Icons.search),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
@@ -168,6 +174,9 @@ class _RouteSelectionScreenState extends State<RouteSelectionScreen> {
   Future<void> _logout() async {
     try {
       await AuthService().signOut();
+      // Clear language preference on logout
+      final languageService = Provider.of<LanguageService>(context, listen: false);
+      await languageService.clearLanguage();
     } finally {
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
